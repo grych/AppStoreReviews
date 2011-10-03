@@ -14,6 +14,7 @@ from elementtree import ElementTree
 import sys
 import string
 import argparse
+import re
 
 appStores = {
 'Argentina':          143505,
@@ -100,21 +101,24 @@ def getReviews(appStoreId, appId):
         return list format: [{"topic": unicode string, "review": unicode string, "rank": int}]
     ''' 
     reviews=[]; stars=[]; topics=[]
+    versions=[]; users=[]
     i=0
     while True: 
-        (r,s,t)=_getReviewsForPage(appStoreId, appId, i)
+        (r,s,t,v,u)=_getReviewsForPage(appStoreId, appId, i)
         if len(r)==0: # funny do while emulation ;)
             break
         reviews.extend(r)
         stars.extend(s)
         topics.extend(t)
+        versions.extend(v)
+        users.extend(u)
         i += 1
     if len(reviews)!=len(stars):
         print "UUPS! Spanish inquisition detected. Resistance is futile. This script is giving up."
         raise SystemExit
     output = []
     for i in range(len(reviews)):
-        output.append({"review": reviews[i], "rank":stars[i], "topic":topics[i] })
+        output.append({"review": reviews[i], "rank":stars[i], "topic":topics[i], "version":versions[i], "user":users[i] })
     return output
 
 def _getReviewsForPage(appStoreId, appId, pageNo):
@@ -129,8 +133,13 @@ def _getReviewsForPage(appStoreId, appId, pageNo):
         raise SystemExit
     root = ElementTree.parse(u).getroot()
     reviews=[]; stars=[]; topics=[]
+    versions=[]; users=[]
     for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle'):
         reviews.append(node.text)
+    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL'):
+        versions.append(re.search("Version [^\n^\ ]+", node.tail).group())
+    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL/{http://www.apple.com/itms/}b'):
+        users.append(node.text.strip())
     for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView'):
         try:
             alt = node.attrib['alt']
@@ -141,18 +150,21 @@ def _getReviewsForPage(appStoreId, appId, pageNo):
     for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}b'):
         topics.append(node.text)
     u.close()
-    return (reviews, stars, topics)
+    return (reviews, stars, topics, versions, users)
     
 def _print_reviews(reviews, country):
     ''' returns (reviews count, sum rank)
     '''
     if len(reviews)>0:
         print "Reviews in %s:" % (country)
+        print ""
         sumRank = 0
         for review in reviews:
+            print "%s by %s" % (review["version"], review["user"])
             for i in range(review["rank"]):
                 sys.stdout.write ("*") # to avoid space or newline after print
             print " (%s) %s" % (review["topic"], review["review"])
+            print ""
             sumRank += review["rank"]
         print "Number of reviews in %s: %d, avg rank: %.2f\n" % (country, len(reviews), 1.0*sumRank/len(reviews))
         return (len(reviews), sumRank)
