@@ -100,26 +100,15 @@ def getReviews(appStoreId, appId):
     ''' returns list of reviews for given AppStore ID and application Id
         return list format: [{"topic": unicode string, "review": unicode string, "rank": int}]
     ''' 
-    reviews=[]; stars=[]; topics=[]
-    versions=[]; users=[]
+    reviews=[]
     i=0
     while True: 
-        (r,s,t,v,u)=_getReviewsForPage(appStoreId, appId, i)
-        if len(r)==0: # funny do while emulation ;)
+        ret = _getReviewsForPage(appStoreId, appId, i)
+        if len(ret)==0: # funny do while emulation ;)
             break
-        reviews.extend(r)
-        stars.extend(s)
-        topics.extend(t)
-        versions.extend(v)
-        users.extend(u)
+        reviews += ret
         i += 1
-    if len(reviews)!=len(stars):
-        print "UUPS! Spanish inquisition detected. Resistance is futile. This script is giving up."
-        raise SystemExit
-    output = []
-    for i in range(len(reviews)):
-        output.append({"review": reviews[i], "rank":stars[i], "topic":topics[i], "version":versions[i], "user":users[i] })
-    return output
+    return reviews
 
 def _getReviewsForPage(appStoreId, appId, pageNo):
     userAgent = 'iTunes/9.2 (Macintosh; U; Mac OS X 10.6)'
@@ -132,25 +121,44 @@ def _getReviewsForPage(appStoreId, appId, pageNo):
         print "Can't connect to the AppStore, please try again later."
         raise SystemExit
     root = ElementTree.parse(u).getroot()
-    reviews=[]; stars=[]; topics=[]
-    versions=[]; users=[]
-    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle'):
-        reviews.append(node.text)
-    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL'):
-        versions.append(re.search("Version [^\n^\ ]+", node.tail).group())
-    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL/{http://www.apple.com/itms/}b'):
-        users.append(node.text.strip())
-    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView'):
+    reviews=[]
+    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/'):
+        review = {}
+
+        review_node = node.find("{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle")
+        if review_node is None:
+            review["review"] = None
+        else:
+            review["review"] = review_node.text
+
+        version_node = node.find("{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL")
+        if version_node is None:
+            review["version"] = None
+        else:
+            review["version"] = re.search("Version [^\n^\ ]+", version_node.tail).group()
+    
+        user_node = node.find("{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}GotoURL/{http://www.apple.com/itms/}b")
+        if user_node is None:
+            review["user"] = None
+        else:
+            review["user"] = user_node.text.strip()
+
+        rank_node = node.find("{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}HBoxView")
         try:
-            alt = node.attrib['alt']
+            alt = rank_node.attrib['alt']
             st = int(alt.strip(' stars'))
+            review["rank"] = st
         except KeyError:
-            continue
-        stars.append(st)
-    for node in root.findall('{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}ScrollView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}View/{http://www.apple.com/itms/}MatrixView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}VBoxView/{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}b'):
-        topics.append(node.text)
-    u.close()
-    return (reviews, stars, topics, versions, users)
+            review["rank"] = None
+
+        topic_node = node.find("{http://www.apple.com/itms/}HBoxView/{http://www.apple.com/itms/}TextView/{http://www.apple.com/itms/}SetFontStyle/{http://www.apple.com/itms/}b")
+        if topic_node is None:
+            review["topic"] = None
+        else:
+            review["topic"] = topic_node.text
+
+        reviews.append(review)
+    return reviews
     
 def _print_reviews(reviews, country):
     ''' returns (reviews count, sum rank)
