@@ -181,12 +181,17 @@ def _print_reviews(reviews, country):
     else:
         return (0, 0)
 
+def _print_rawmode(reviews):
+    for review in reviews:
+        print review["topic"], review["review"].replace("\n","")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='AppStoreReviewsScrapper command line.', epilog='To get your application Id look into the AppStore link to you app, for example http://itunes.apple.com/pl/app/autobuser-warszawa/id335042980?mt=8 - app Id is the number between "id" and "?mt=0"')
     parser.add_argument('-i', '--id', default=0, metavar='AppId', type=int, help='Application Id (see below)')
     parser.add_argument('-c', '--country', metavar='"Name"', type=str, default='all', help='AppStore country name (use -l to see them)')
     parser.add_argument('-l', '--list', action='store_true', default=False, help='AppStores list')
     parser.add_argument('-m', '--max-reviews',default=-1,metavar='MaxReviews',type=int,help='Max number of reviews to load')
+    parser.add_argument('-r', '--raw-mode',action='store_true',default=False,help='Print raw mode')
     args = parser.parse_args()
     if args.id == 0:
         parser.print_help()
@@ -209,7 +214,10 @@ if __name__ == '__main__':
         else:
             try:
                 reviews = getReviews(appStores[country], args.id,maxReviews=args.max_reviews)
-                _print_reviews(reviews, country)
+                if args.raw_mode:
+                    _print_rawmode(reviews)
+                else:
+                    _print_reviews(reviews, country)
             except KeyError:
                 print "No such country %s!\n\nWell, it could exist in real life, but I dont know it." % country
             pass
