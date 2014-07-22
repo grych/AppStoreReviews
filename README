@@ -6,6 +6,7 @@ Need python version 2.6 at least, not compatible with python 3.0. Additional mod
 % sudo easy_install argparse
 The output is given with UTF-8 charsets; if you are scraping non-english AppStore set the environment to use UTF:
 % export LANG=en_US.UTF-8
+% export PYTHONIOENCODING=utf-8
 
 USAGE
 AppStoreReviews.py [-h] [-i AppId] [-c "Name"] [-l]
